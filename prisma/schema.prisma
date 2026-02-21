@@ -1,0 +1,206 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  station_owner
+  admin
+}
+
+enum Plan {
+  starter
+  professional
+  enterprise
+}
+
+model User {
+  id                String    @id @default(uuid()) @db.Uuid
+  name              String    @db.VarChar(120)
+  email             String    @unique @db.VarChar(150)
+  phone             String?   @db.VarChar(30)
+  role              UserRole  @default(station_owner)
+  subscription_plan Plan      @default(starter)
+  station_id        Int?
+  station           Station?  @relation(fields: [station_id], references: [id])
+  created_at        DateTime  @default(now())
+  bookings          Booking[]
+
+  @@map("users")
+}
+
+model Station {
+  id                 Int         @id @default(autoincrement())
+  name               String      @db.VarChar(120)
+  code               String      @unique @db.VarChar(20)
+  city               String?     @db.VarChar(120)
+  country            String?     @db.VarChar(120)
+  latitude           Decimal?    @db.Decimal(10, 8)
+  longitude          Decimal?    @db.Decimal(11, 8)
+  source_routes      Route[]     @relation("SourceStation")
+  destination_routes Route[]     @relation("DestinationStation")
+  route_stops        RouteStop[]
+  users              User[]
+
+  @@map("stations")
+}
+
+model Train {
+  id           Int     @id @default(autoincrement())
+  train_number String  @unique @db.VarChar(50)
+  name         String? @db.VarChar(150)
+  total_seats  Int?
+  routes       Route[]
+  coaches      Coach[]
+
+  @@map("trains")
+}
+
+model Route {
+  id                     Int         @id @default(autoincrement())
+  train_id               Int
+  train                  Train       @relation(fields: [train_id], references: [id], onDelete: Cascade)
+  source_station_id      Int
+  source_station         Station     @relation("SourceStation", fields: [source_station_id], references: [id])
+  destination_station_id Int
+  destination_station    Station     @relation("DestinationStation", fields: [destination_station_id], references: [id])
+  distance_km            Decimal?    @db.Decimal(8, 2)
+  route_stops            RouteStop[]
+  schedules              Schedule[]
+
+  @@map("routes")
+}
+
+model RouteStop {
+  id             Int       @id @default(autoincrement())
+  route_id       Int
+  route          Route     @relation(fields: [route_id], references: [id], onDelete: Cascade)
+  station_id     Int
+  station        Station   @relation(fields: [station_id], references: [id])
+  stop_order     Int
+  arrival_time   DateTime? @db.Time
+  departure_time DateTime? @db.Time
+
+  @@unique([route_id, stop_order])
+  @@map("route_stops")
+}
+
+enum ScheduleStatus {
+  on_time
+  delayed
+  cancelled
+}
+
+model Schedule {
+  id             Int            @id @default(autoincrement())
+  route_id       Int
+  route          Route          @relation(fields: [route_id], references: [id], onDelete: Cascade)
+  travel_date    DateTime       @db.Date
+  departure_time DateTime
+  arrival_time   DateTime
+  status         ScheduleStatus @default(on_time)
+  bookings       Booking[]
+
+  @@map("schedules")
+}
+
+enum CoachClass {
+  sleeper
+  AC
+  economy
+}
+
+model Coach {
+  id           Int         @id @default(autoincrement())
+  train_id     Int
+  train        Train       @relation(fields: [train_id], references: [id], onDelete: Cascade)
+  coach_number String      @db.VarChar(20)
+  class        CoachClass?
+  seats        Seat[]
+
+  @@unique([train_id, coach_number])
+  @@map("coaches")
+}
+
+enum SeatType {
+  window
+  aisle
+  middle
+}
+
+model Seat {
+  id          Int         @id @default(autoincrement())
+  coach_id    Int
+  coach       Coach       @relation(fields: [coach_id], references: [id], onDelete: Cascade)
+  seat_number String      @db.VarChar(10)
+  seat_type   SeatType?
+  passengers  Passenger[]
+
+  @@unique([coach_id, seat_number])
+  @@map("seats")
+}
+
+enum BookingStatus {
+  confirmed
+  waitlisted
+  cancelled
+}
+
+model Booking {
+  id             String        @id @default(uuid()) @db.Uuid
+  user_id        String        @db.Uuid
+  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  schedule_id    Int
+  schedule       Schedule      @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+  booking_status BookingStatus @default(confirmed)
+  total_amount   Decimal       @db.Decimal(10, 2)
+  booked_at      DateTime      @default(now())
+  passengers     Passenger[]
+  payments       Payment[]
+
+  @@map("bookings")
+}
+
+model Passenger {
+  id         Int     @id @default(autoincrement())
+  booking_id String  @db.Uuid
+  booking    Booking @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  name       String  @db.VarChar(120)
+  age        Int?
+  gender     String? @db.VarChar(20)
+  seat_id    Int?    @unique
+  seat       Seat?   @relation(fields: [seat_id], references: [id])
+
+  @@map("passengers")
+}
+
+enum PaymentMethod {
+  card
+  wallet
+  cash
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+}
+
+model Payment {
+  id              Int            @id @default(autoincrement())
+  booking_id      String         @db.Uuid
+  booking         Booking        @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  amount          Decimal        @db.Decimal(10, 2)
+  payment_method  PaymentMethod?
+  status          PaymentStatus  @default(pending)
+  transaction_ref String?        @db.VarChar(200)
+  paid_at         DateTime?
+
+  @@map("payments")
+}

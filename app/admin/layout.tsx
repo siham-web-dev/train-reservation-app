@@ -14,6 +14,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { supabase } from '@/lib/supabase/client';
 
 const { Header, Sider, Content } = Layout;
 const { Title } = Typography;
@@ -26,6 +27,11 @@ export default function AdminLayout({
     const [collapsed, setCollapsed] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push('/');
+    };
 
     return (
         <Layout className="min-h-screen">
@@ -73,7 +79,7 @@ export default function AdminLayout({
                             key: 'logout',
                             icon: <LogoutOutlined className="text-red-500" />,
                             label: <span className="text-red-500">Logout</span>,
-                            onClick: () => router.push('/'),
+                            onClick: handleLogout,
                         },
                     ]}
                     className="mt-4 border-r-0"

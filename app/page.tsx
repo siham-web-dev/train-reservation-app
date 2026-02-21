@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Layout, Input, Button, FloatButton, Typography, Spin, Form, DatePicker, Select } from 'antd';
+import { useState, useEffect } from 'react';
+import { Layout, Input, Button, FloatButton, Typography, Spin, DatePicker, Dropdown, Avatar, MenuProps } from 'antd';
 import {
   RobotOutlined,
   SearchOutlined,
@@ -10,13 +10,18 @@ import {
   MenuOutlined,
   CompassOutlined,
   EnvironmentOutlined,
-  MinusOutlined
+  MinusOutlined,
+  LogoutOutlined,
+  DownOutlined
 } from '@ant-design/icons';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import SignIn from './components/SignIn';
 import ContactAdminstrator from './components/ContactAdminstrator';
 import ChatbotBox from './components/ChatbotBox';
+import { supabase } from '@/lib/supabase/client';
+//import { useRouter } from 'next/navigation';
+import { signOut } from './actions/auth';
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -36,6 +41,49 @@ export default function Home() {
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
   const [isTrackSidebarVisible, setIsTrackSidebarVisible] = useState(true);
   const [isChatVisible, setIsChatVisible] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  // const router = useRouter();
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
+  });
+
+  const getSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setUser(session?.user ?? null);
+  };
+
+
+  useEffect(() => {
+    getSession();
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    }
+  }, [supabase.auth]);
+
+  const handleLogout = async () => {
+    await signOut();
+  };
+
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'profile',
+      label: 'My Profile',
+      icon: <UserOutlined />,
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'logout',
+      label: 'Logout',
+      icon: <LogoutOutlined />,
+      danger: true,
+      onClick: handleLogout,
+    },
+  ];
 
   return (
     <Layout className="min-h-screen">
@@ -65,9 +113,28 @@ export default function Home() {
             Contact Administrator
           </Button>
           <div className="w-px h-6 bg-gray-200 mx-2"></div>
-          <Button type="primary" icon={<UserOutlined />} size="large" className="rounded-full px-6 font-medium shadow-md shadow-blue-500/20" onClick={() => setIsSignInModalVisible(true)}>
-            Sign In
-          </Button>
+          {user ? (
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
+              <div className="flex items-center gap-3 cursor-pointer p-1.5 hover:bg-gray-50 rounded-full transition-colors border border-gray-100 pr-4">
+                <Avatar
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`}
+                  icon={<UserOutlined />}
+                  className="bg-blue-600 shadow-sm"
+                />
+                <div className="flex flex-col">
+                  <Text strong className="text-[13px] leading-tight max-w-[120px] truncate">
+                    {user.user_metadata?.name || user.email?.split('@')[0]}
+                  </Text>
+                  <Text type="secondary" className="text-[10px] leading-tight">Member</Text>
+                </div>
+                <DownOutlined className="text-[10px] text-gray-400" />
+              </div>
+            </Dropdown>
+          ) : (
+            <Button type="primary" icon={<UserOutlined />} size="large" className="rounded-full px-6 font-medium shadow-md shadow-blue-500/20" onClick={() => setIsSignInModalVisible(true)}>
+              Sign In
+            </Button>
+          )}
         </div>
 
         {/* Mobile menu toggle */}
