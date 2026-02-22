@@ -213,6 +213,7 @@ enum BookingStatus {
   confirmed
   waitlisted
   cancelled
+  pending
 }
 
 model Booking {

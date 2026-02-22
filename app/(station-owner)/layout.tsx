@@ -12,6 +12,7 @@ import {
     LogoutOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
+    ReconciliationOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -57,6 +58,11 @@ export default function StationOwnerLayout({
                             key: '/reservations',
                             icon: <ScheduleOutlined />,
                             label: <Link href="/reservations">Reservations</Link>,
+                        },
+                        {
+                            key: '/bookings',
+                            icon: <ReconciliationOutlined />,
+                            label: <Link href="/bookings">Bookings</Link>,
                         },
                         {
                             key: '/passengers',

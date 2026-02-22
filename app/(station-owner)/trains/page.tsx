@@ -5,9 +5,107 @@ import { Typography, Table, Button, Space, Tag, Input, Spin, Modal, Form, messag
 import { PlusOutlined, EditOutlined, SearchOutlined } from '@ant-design/icons';
 import { getUserProfile } from '@/app/actions/auth';
 import { getStationTrains, addTrain, getTrainCoaches, updateSeat, addSeat, deleteSeat } from '@/app/actions/fleet';
-import { PlusCircleOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { getTrainReservations } from '@/app/actions/bookings';
+import { PlusCircleOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, InfoCircleOutlined, HistoryOutlined, LayoutOutlined } from '@ant-design/icons';
+import { Tabs } from 'antd';
 
 const { Title, Text } = Typography;
+
+const TrainBookingsList = ({ trainId }: { trainId: number }) => {
+    const [bookings, setBookings] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchBookings = async () => {
+        setLoading(true);
+        const res = await getTrainReservations(trainId);
+        if (!res.error && res.data) {
+            setBookings(res.data);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchBookings();
+    }, [trainId]);
+
+    const columns = [
+        {
+            title: 'Booking ID',
+            dataIndex: 'id',
+            key: 'id',
+            render: (text: string) => <Text strong className="text-blue-600">{text}</Text>,
+        },
+        {
+            title: 'Passenger',
+            dataIndex: 'passenger',
+            key: 'passenger',
+        },
+        {
+            title: 'Route',
+            dataIndex: 'route',
+            key: 'route',
+        },
+        {
+            title: 'Date',
+            dataIndex: 'date',
+            key: 'date',
+        },
+        {
+            title: 'Amount',
+            dataIndex: 'amount',
+            key: 'amount',
+        },
+        {
+            title: 'Status',
+            dataIndex: 'status',
+            key: 'status',
+            render: (status: string) => {
+                const colors: Record<string, string> = {
+                    confirmed: 'success',
+                    pending: 'warning',
+                    cancelled: 'error',
+                    waitlisted: 'processing'
+                };
+                return <Tag color={colors[status] || 'default'}>{status.toUpperCase()}</Tag>;
+            }
+        }
+    ];
+
+    return (
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="flex justify-between items-center mb-4">
+                <Title level={5} className="!m-0">Train Bookings History</Title>
+                <Button size="small" icon={<HistoryOutlined />} onClick={fetchBookings}>Refresh</Button>
+            </div>
+            <Table
+                columns={columns}
+                dataSource={bookings}
+                loading={loading}
+                pagination={{ pageSize: 5 }}
+                size="small"
+                className="bg-white rounded-lg"
+                expandable={{
+                    expandedRowRender: (record) => (
+                        <div className="p-4 bg-blue-50/50 rounded-md border border-blue-100">
+                            <Text strong className="block mb-2 text-blue-800">Passenger Details</Text>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {record.details.map((p: any) => (
+                                    <div key={p.id} className="bg-white p-3 rounded border border-gray-200 shadow-sm flex justify-between items-center">
+                                        <div>
+                                            <div className="font-semibold">{p.name}</div>
+                                            <div className="text-xs text-gray-500">{p.age} years • {p.gender}</div>
+                                        </div>
+                                        <Tag color="purple">{p.seat}</Tag>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )
+                }}
+            />
+        </div>
+    );
+};
 
 const CoachSeatDetails = ({ trainId }: { trainId: number }) => {
     const [coaches, setCoaches] = useState<any[]>([]);
@@ -301,7 +399,34 @@ export default function StationOwnerTrainsPage() {
                     columns={columns}
                     dataSource={trains}
                     expandable={{
-                        expandedRowRender: (record) => <CoachSeatDetails trainId={parseInt(record.key)} />,
+                        expandedRowRender: (record) => (
+                            <Tabs
+                                defaultActiveKey="1"
+                                type="card"
+                                items={[
+                                    {
+                                        label: (
+                                            <span>
+                                                <LayoutOutlined />
+                                                Layout
+                                            </span>
+                                        ),
+                                        key: '1',
+                                        children: <CoachSeatDetails trainId={parseInt(record.key)} />,
+                                    },
+                                    {
+                                        label: (
+                                            <span>
+                                                <HistoryOutlined />
+                                                Bookings
+                                            </span>
+                                        ),
+                                        key: '2',
+                                        children: <TrainBookingsList trainId={parseInt(record.key)} />,
+                                    },
+                                ]}
+                            />
+                        ),
                         rowExpandable: (record) => record.coach_count > 0,
                     }}
                 />
