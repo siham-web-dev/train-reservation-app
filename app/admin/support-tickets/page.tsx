@@ -1,8 +1,9 @@
 "use client";
 
-import React from 'react';
-import { Typography, Table, Tag, Input, Space, Button } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Table, Tag, Input, Space, Button, Spin } from 'antd';
 import { SearchOutlined, EyeOutlined } from '@ant-design/icons';
+import { getSupportTickets } from '@/app/actions/support';
 
 const { Title, Text } = Typography;
 
@@ -51,34 +52,31 @@ const columns = [
     },
 ];
 
-const data = [
-    {
-        key: '1',
-        id: '1042',
-        user: 'johndoe@example.com',
-        subject: 'Cannot book a ticket',
-        status: 'Open',
-        date: '2023-10-24 10:30 AM',
-    },
-    {
-        key: '2',
-        id: '1043',
-        user: 'sarah.smith@example.com',
-        subject: 'Refund request',
-        status: 'In Progress',
-        date: '2023-10-23 04:15 PM',
-    },
-    {
-        key: '3',
-        id: '1044',
-        user: 'mike_j@example.com',
-        subject: 'App crashes on map view',
-        status: 'Resolved',
-        date: '2023-10-22 09:00 AM',
-    },
-];
-
 export default function AdminSupportTicketsPage() {
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadTickets() {
+            const result = await getSupportTickets();
+            if ('error' in result) {
+                console.error(result.error);
+            } else {
+                setTickets(result.data || []);
+            }
+            setLoading(false);
+        }
+        loadTickets();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -97,15 +95,14 @@ export default function AdminSupportTicketsPage() {
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="mb-4">
-                    {/* Filters could go here */}
                     <Space>
-                        <Tag color="blue" className="cursor-pointer">All (3)</Tag>
-                        <Tag className="cursor-pointer">Open (1)</Tag>
-                        <Tag className="cursor-pointer">In Progress (1)</Tag>
-                        <Tag className="cursor-pointer">Resolved (1)</Tag>
+                        <Tag color="blue" className="cursor-pointer">All ({tickets.length})</Tag>
+                        <Tag className="cursor-pointer">Open ({tickets.filter(t => t.status === 'Open').length})</Tag>
+                        <Tag className="cursor-pointer">In Progress ({tickets.filter(t => t.status === 'In Progress').length})</Tag>
+                        <Tag className="cursor-pointer">Resolved ({tickets.filter(t => t.status === 'Resolved').length})</Tag>
                     </Space>
                 </div>
-                <Table columns={columns} dataSource={data} />
+                <Table columns={columns} dataSource={tickets} />
             </div>
         </div>
     );

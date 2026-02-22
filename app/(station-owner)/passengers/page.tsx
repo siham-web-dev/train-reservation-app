@@ -1,8 +1,10 @@
 "use client";
 
-import React from 'react';
-import { Typography, Table, Input, Button, Tag, Avatar } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Table, Input, Button, Tag, Avatar, Spin } from 'antd';
 import { SearchOutlined, DownloadOutlined, UserOutlined } from '@ant-design/icons';
+import { getUserProfile } from '@/app/actions/auth';
+import { getStationPassengers } from '@/app/actions/bookings';
 
 const { Title, Text } = Typography;
 
@@ -45,37 +47,58 @@ const columns = [
     },
 ];
 
-const data = [
-    {
-        key: '1',
-        name: 'Emma Watson',
-        email: 'emma.w@example.com',
-        route: 'Central -> North Junction',
-        trips: 42,
-        status: 'Active',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emma'
-    },
-    {
-        key: '2',
-        name: 'Liam Neeson',
-        email: 'liam.n@example.com',
-        route: 'Eastside -> Central',
-        trips: 15,
-        status: 'Active',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Liam'
-    },
-    {
-        key: '3',
-        name: 'Olivia Pope',
-        email: 'olivia.p@example.com',
-        route: 'Central -> West Park',
-        trips: 3,
-        status: 'Inactive',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Olivia'
-    },
-];
-
 export default function StationOwnerPassengersPage() {
+    const [passengers, setPassengers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const loadData = async () => {
+        setLoading(true);
+        const profileRes = await getUserProfile();
+        if (profileRes.data?.station_id) {
+            const passengersRes = await getStationPassengers(profileRes.data.station_id);
+            if (!('error' in passengersRes)) {
+                setPassengers(passengersRes.data);
+            }
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const exportToCSV = () => {
+        const headers = ['Name', 'Email', 'Frequent Route', 'Total Trips', 'Status'];
+        const csvContent = [
+            headers.join(','),
+            ...passengers.map(p => [
+                p.name,
+                p.email,
+                `"${p.route}"`,
+                p.trips,
+                p.status
+            ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `passengers_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -89,14 +112,19 @@ export default function StationOwnerPassengersPage() {
                         prefix={<SearchOutlined className="text-gray-400" />}
                         className="rounded-lg w-full sm:w-72"
                     />
-                    <Button icon={<DownloadOutlined />} className="rounded-lg shadow-sm">
+                    <Button
+                        icon={<DownloadOutlined />}
+                        className="rounded-lg shadow-sm"
+                        onClick={exportToCSV}
+                        disabled={passengers.length === 0}
+                    >
                         Export CSV
                     </Button>
                 </div>
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-                <Table columns={columns} dataSource={data} />
+                <Table columns={columns} dataSource={passengers} />
             </div>
         </div>
     );

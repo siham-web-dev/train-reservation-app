@@ -1,12 +1,37 @@
 "use client";
 
-import React from 'react';
-import { Typography, Row, Col, Card } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Row, Col, Card, Spin } from 'antd';
 import { UserOutlined, EnvironmentOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { getAdminAnalytics } from '@/app/actions/analytics';
 
 const { Title, Text } = Typography;
 
 export default function AdminAnalyticsPage() {
+    const [stats, setStats] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadStats() {
+            const data = await getAdminAnalytics();
+            if ('error' in data) {
+                console.error(data.error);
+            } else {
+                setStats(data);
+            }
+            setLoading(false);
+        }
+        loadStats();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div>
@@ -23,7 +48,7 @@ export default function AdminAnalyticsPage() {
                             </div>
                             <div>
                                 <Text type="secondary" className="block">Total Users</Text>
-                                <Title level={3} className="!m-0">24,592</Title>
+                                <Title level={3} className="!m-0">{stats?.totalUsers?.toLocaleString() || 0}</Title>
                             </div>
                         </div>
                     </Card>
@@ -36,7 +61,7 @@ export default function AdminAnalyticsPage() {
                             </div>
                             <div>
                                 <Text type="secondary" className="block">Active Stations</Text>
-                                <Title level={3} className="!m-0">142</Title>
+                                <Title level={3} className="!m-0">{stats?.activeStations?.toLocaleString() || 0}</Title>
                             </div>
                         </div>
                     </Card>
@@ -49,7 +74,7 @@ export default function AdminAnalyticsPage() {
                             </div>
                             <div>
                                 <Text type="secondary" className="block">Tickets Booked (Today)</Text>
-                                <Title level={3} className="!m-0">3,850</Title>
+                                <Title level={3} className="!m-0">{stats?.ticketsToday?.toLocaleString() || 0}</Title>
                             </div>
                         </div>
                     </Card>

@@ -1,8 +1,10 @@
 "use client";
 
-import React from 'react';
-import { Typography, Table, Tag, Input, Button, Avatar, Space } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Table, Tag, Input, Button, Avatar, Space, Spin, Modal, Form, message } from 'antd';
 import { SearchOutlined, UserOutlined, MailOutlined, PhoneOutlined, PlusOutlined } from '@ant-design/icons';
+import { getUserProfile } from '@/app/actions/auth';
+import { getDrivers, createDriver } from '@/app/actions/drivers';
 
 const { Title, Text } = Typography;
 
@@ -58,40 +60,54 @@ const columns = [
     },
 ];
 
-const data = [
-    {
-        key: '1',
-        id: 'DRV-1029',
-        driver: 'Michael Scott',
-        email: 'michael.s@example.com',
-        phone: '+1 555-0192',
-        status: 'On Duty',
-        train: 'T-Express 401',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Michael'
-    },
-    {
-        key: '2',
-        id: 'DRV-1030',
-        driver: 'Dwight Schrute',
-        email: 'dwight.s@example.com',
-        phone: '+1 555-0193',
-        status: 'Off Duty',
-        train: null,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Dwight'
-    },
-    {
-        key: '3',
-        id: 'DRV-1031',
-        driver: 'Jim Halpert',
-        email: 'jim.h@example.com',
-        phone: '+1 555-0194',
-        status: 'On Leave',
-        train: null,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jim'
-    },
-];
-
 export default function StationOwnerDriversPage() {
+    const [drivers, setDrivers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [stationId, setStationId] = useState<number | null>(null);
+    const [form] = Form.useForm();
+
+    const loadData = async () => {
+        setLoading(true);
+        const profileRes = await getUserProfile();
+        if (profileRes.data?.station_id) {
+            setStationId(profileRes.data.station_id);
+            const driversRes = await getDrivers(profileRes.data.station_id);
+            if (!('error' in driversRes)) {
+                setDrivers(driversRes.data);
+            }
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const handleCreateDriver = async (values: any) => {
+        if (!stationId) return;
+        setSubmitting(true);
+        const res = await createDriver(stationId, values);
+        setSubmitting(false);
+        if (res.error) {
+            message.error(res.error);
+        } else {
+            message.success('Driver hired successfully!');
+            setIsModalVisible(false);
+            form.resetFields();
+            loadData();
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -105,7 +121,12 @@ export default function StationOwnerDriversPage() {
                         prefix={<SearchOutlined className="text-gray-400" />}
                         className="rounded-lg w-full sm:w-56"
                     />
-                    <Button type="primary" icon={<PlusOutlined />} className="rounded-lg shadow-md shadow-blue-500/20">
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        className="rounded-lg shadow-md shadow-blue-500/20"
+                        onClick={() => setIsModalVisible(true)}
+                    >
                         Hire Driver
                     </Button>
                 </div>
@@ -114,13 +135,39 @@ export default function StationOwnerDriversPage() {
             <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
                 <div className="mb-4">
                     <Space wrap>
-                        <Tag color="blue" className="cursor-pointer text-sm py-1 px-3">All Drivers (45)</Tag>
-                        <Tag className="cursor-pointer text-sm py-1 px-3 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 block"></span> On Duty (12)</Tag>
-                        <Tag className="cursor-pointer text-sm py-1 px-3 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400 block"></span> Off Duty (30)</Tag>
+                        <Tag color="blue" className="cursor-pointer text-sm py-1 px-3">All Drivers ({drivers.length})</Tag>
+                        <Tag className="cursor-pointer text-sm py-1 px-3 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 block"></span> On Duty ({drivers.filter(d => d.status === 'On Duty').length})</Tag>
+                        <Tag className="cursor-pointer text-sm py-1 px-3 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400 block"></span> Off Duty ({drivers.filter(d => d.status === 'Off Duty').length})</Tag>
                     </Space>
                 </div>
-                <Table columns={columns} dataSource={data} />
+                <Table columns={columns} dataSource={drivers} />
             </div>
+
+            <Modal
+                title="Hire New Driver"
+                open={isModalVisible}
+                onCancel={() => setIsModalVisible(false)}
+                footer={null}
+            >
+                <Form form={form} layout="vertical" onFinish={handleCreateDriver}>
+                    <Form.Item label="Full Name" name="name" required rules={[{ required: true, message: 'Please enter driver name' }]}>
+                        <Input />
+                    </Form.Item>
+                    <Form.Item label="Email" name="email" required rules={[{ required: true, type: 'email', message: 'Please enter valid email' }]}>
+                        <Input />
+                    </Form.Item>
+                    <Form.Item label="Phone" name="phone">
+                        <Input />
+                    </Form.Item>
+                    <Form.Item label="License Number" name="license_number">
+                        <Input />
+                    </Form.Item>
+                    <div className="flex justify-end gap-2">
+                        <Button onClick={() => setIsModalVisible(false)}>Cancel</Button>
+                        <Button type="primary" htmlType="submit" loading={submitting}>Hire Driver</Button>
+                    </div>
+                </Form>
+            </Modal>
         </div>
     );
 }

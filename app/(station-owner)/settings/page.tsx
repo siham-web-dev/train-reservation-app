@@ -1,13 +1,70 @@
 "use client";
 
-import React from 'react';
-import { Typography, Tabs, Form, Input, Select, Button, Switch, Divider, Avatar, Upload, List, Tag } from 'antd';
-import { UploadOutlined, CreditCardOutlined, UserOutlined, QuestionCircleOutlined, MessageOutlined, FileTextOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from 'react';
+import { Typography, Tabs, Form, Input, Select, Button, Switch, Divider, Avatar, Upload, List, Tag, message, Spin } from 'antd';
+import { UploadOutlined, CreditCardOutlined, UserOutlined, QuestionCircleOutlined, MessageOutlined, FileTextOutlined, PlusOutlined } from '@ant-design/icons';
+import { getUserProfile, updateProfile } from '@/app/actions/auth';
+import { getStationSubscription } from '@/app/actions/billing';
+import { createSupportTicket } from '@/app/actions/support';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function StationOwnerSettingsPage() {
+    const [profile, setProfile] = useState<any>(null);
+    const [subscription, setSubscription] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [form] = Form.useForm();
+
+    useEffect(() => {
+        async function loadData() {
+            const profileRes = await getUserProfile();
+            if (profileRes.data) {
+                setProfile(profileRes.data);
+                if (profileRes.data.station_id) {
+                    const subRes = await getStationSubscription(profileRes.data.station_id);
+                    if (!('error' in subRes)) {
+                        setSubscription(subRes.data);
+                    }
+                }
+            }
+            setLoading(false);
+        }
+        loadData();
+    }, []);
+
+    const handleSupportSubmit = async (values: any) => {
+        setSubmitting(true);
+        const res = await createSupportTicket(values);
+        setSubmitting(false);
+        if (res.error) {
+            message.error(res.error);
+        } else {
+            message.success('Support ticket submitted successfully!');
+            form.resetFields();
+        }
+    };
+
+    const handleProfileSubmit = async (values: any) => {
+        setSubmitting(true);
+        const res = await updateProfile(values);
+        setSubmitting(false);
+        if (res.error) {
+            message.error(res.error);
+        } else {
+            message.success('Profile updated successfully!');
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6 max-w-5xl">
             <div>
@@ -25,27 +82,32 @@ export default function StationOwnerSettingsPage() {
                             children: (
                                 <div className="p-4 max-w-2xl">
                                     <div className="flex items-center gap-6 mb-8">
-                                        <Avatar size={100} icon={<UserOutlined />} src="/api/placeholder/100/100" />
+                                        <Avatar size={100} icon={<UserOutlined />} src={profile?.avatar_url} />
                                         <div>
                                             <Button icon={<UploadOutlined />} className="mb-2">Change Picture</Button>
                                             <div className="text-xs text-gray-500">JPG, GIF or PNG. Max size of 800K</div>
                                         </div>
                                     </div>
 
-                                    <Form layout="vertical">
-                                        <Form.Item label="Station Manager Name">
-                                            <Input defaultValue="Robert Manager" size="large" />
+                                    <Form layout="vertical" onFinish={handleProfileSubmit} initialValues={{
+                                        name: profile?.name,
+                                        email: profile?.email,
+                                        phone: profile?.phone,
+                                        address: profile?.station?.location
+                                    }}>
+                                        <Form.Item label="Station Manager Name" name="name" required rules={[{ required: true, message: 'Please enter your name' }]}>
+                                            <Input size="large" />
                                         </Form.Item>
-                                        <Form.Item label="Email Address">
-                                            <Input defaultValue="robert@centralstation.com" size="large" />
+                                        <Form.Item label="Email Address" name="email">
+                                            <Input size="large" disabled />
                                         </Form.Item>
-                                        <Form.Item label="Phone Number">
-                                            <Input defaultValue="+1 (555) 123-4567" size="large" />
+                                        <Form.Item label="Phone Number" name="phone">
+                                            <Input size="large" />
                                         </Form.Item>
-                                        <Form.Item label="Station Address">
-                                            <Input.TextArea defaultValue="123 Main St, New York, NY 10001" rows={3} />
+                                        <Form.Item label="Station Address" name="address">
+                                            <Input.TextArea rows={3} />
                                         </Form.Item>
-                                        <Button type="primary" size="large" className="mt-4">Save Changes</Button>
+                                        <Button type="primary" size="large" className="mt-4" htmlType="submit" loading={submitting}>Save Changes</Button>
                                     </Form>
                                 </div>
                             ),
@@ -82,54 +144,38 @@ export default function StationOwnerSettingsPage() {
                             ),
                         },
                         {
-                            key: '3',
-                            label: 'Language',
-                            children: (
-                                <div className="p-4 max-w-2xl">
-                                    <Title level={4}>Language Preferences</Title>
-                                    <Text type="secondary" className="block mb-6">Choose the default language for your dashboard and communications.</Text>
-
-                                    <Form layout="vertical">
-                                        <Form.Item label="Display Language">
-                                            <Select defaultValue="en" size="large">
-                                                <Option value="en">English (US)</Option>
-                                                <Option value="fr">French (Français)</Option>
-                                                <Option value="es">Spanish (Español)</Option>
-                                                <Option value="de">German (Deutsch)</Option>
-                                            </Select>
-                                        </Form.Item>
-                                        <Button type="primary" size="large" className="mt-4">Save Language</Button>
-                                    </Form>
-                                </div>
-                            ),
-                        },
-                        {
                             key: '4',
                             label: 'Billing',
                             children: (
                                 <div className="p-4">
                                     <Title level={4}>Subscription & Payment</Title>
-                                    <div className="mb-8 p-6 bg-blue-50/50 rounded-xl border border-blue-100 max-w-3xl">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <Title level={5} className="!text-blue-800 !m-0">Pro Station Plan</Title>
-                                                <Text className="text-blue-600 block mt-1">$199.00 / month</Text>
-                                                <Text type="secondary" className="text-xs block mt-2">Next billing date: Nov 15, 2023</Text>
+                                    {subscription ? (
+                                        <div className="mb-8 p-6 bg-blue-50/50 rounded-xl border border-blue-100 max-w-3xl">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <Title level={5} className="!text-blue-800 !m-0 capitalize">{subscription.plan_type} Plan</Title>
+                                                    <Tag color="green" className="mt-2">Active</Tag>
+                                                    <Text type="secondary" className="text-xs block mt-2">Started on: {new Date(subscription.created_at).toLocaleDateString()}</Text>
+                                                </div>
+                                                <Button>Manage Subscription</Button>
                                             </div>
-                                            <Button>Upgrade Plan</Button>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-200 max-w-3xl">
+                                            <Text type="secondary">No active subscription found.</Text>
+                                            <Button type="primary" className="block mt-4">Choose a Plan</Button>
+                                        </div>
+                                    )}
 
                                     <Title level={5} className="mt-8 mb-4">Payment Methods</Title>
                                     <div className="max-w-3xl">
                                         <List
                                             itemLayout="horizontal"
                                             dataSource={[
-                                                { title: 'Visa ending in 4242', description: 'Expires 12/2024', isDefault: true },
-                                                { title: 'Mastercard ending in 8899', description: 'Expires 08/2025', isDefault: false }
+                                                { title: 'Visa ending in 4242', description: 'Expires 12/2024', isDefault: true }
                                             ]}
                                             className="border border-gray-200 rounded-lg mb-4"
-                                            renderItem={(item, index) => (
+                                            renderItem={(item) => (
                                                 <List.Item
                                                     actions={[
                                                         !item.isDefault && <Button type="link" key="make-default">Make Default</Button>,
@@ -189,14 +235,16 @@ export default function StationOwnerSettingsPage() {
                                     <Divider />
 
                                     <Title level={5} className="mb-4">Contact Support</Title>
-                                    <Form layout="vertical">
-                                        <Form.Item label="Subject" required>
+                                    <Form form={form} layout="vertical" onFinish={handleSupportSubmit}>
+                                        <Form.Item label="Subject" name="subject" required rules={[{ required: true, message: 'Please enter a subject' }]}>
                                             <Input placeholder="E.g., Issue with billing" size="large" />
                                         </Form.Item>
-                                        <Form.Item label="Message" required>
+                                        <Form.Item label="Message" name="message" required rules={[{ required: true, message: 'Please enter your message' }]}>
                                             <Input.TextArea placeholder="Describe your issue in detail..." rows={5} />
                                         </Form.Item>
-                                        <Button type="primary" size="large" icon={<MessageOutlined />}>Submit Support Ticket</Button>
+                                        <Button type="primary" size="large" icon={<MessageOutlined />} htmlType="submit" loading={submitting}>
+                                            Submit Support Ticket
+                                        </Button>
                                     </Form>
                                 </div>
                             ),
@@ -207,5 +255,3 @@ export default function StationOwnerSettingsPage() {
         </div>
     );
 }
-// Placeholder for PlusOutlined import since it was missing above
-import { PlusOutlined } from '@ant-design/icons';

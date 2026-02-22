@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Typography, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, message, Row, Col, Card } from 'antd';
+import { Typography, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, message, Row, Col, Card, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, MailOutlined } from '@ant-design/icons';
-import { getStations, createStationWithOwner } from '../../actions/stations';
+import { getStations, createStationWithOwner, deleteStation } from '../../actions/stations';
 
 const { Title, Text } = Typography;
 
@@ -12,6 +12,7 @@ export default function AdminStationsPage() {
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
     const [stations, setStations] = useState<any[]>([]);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
     const [form] = Form.useForm();
 
     const fetchStations = async () => {
@@ -33,6 +34,18 @@ export default function AdminStationsPage() {
     useEffect(() => {
         fetchStations();
     }, []);
+
+    const handleDelete = async (id: number) => {
+        setDeletingId(id);
+        const result = await deleteStation(id);
+        if (result.success) {
+            message.success('Station and its owner deleted successfully!');
+            fetchStations();
+        } else {
+            message.error(result.error);
+        }
+        setDeletingId(null);
+    };
 
     const columns = [
         {
@@ -72,10 +85,25 @@ export default function AdminStationsPage() {
         {
             title: 'Action',
             key: 'action',
-            render: () => (
+            render: (_: any, record: any) => (
                 <Space size="middle">
                     <Button type="text" icon={<EditOutlined className="text-blue-500" />} />
-                    <Button type="text" danger icon={<DeleteOutlined />} />
+                    <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => {
+                            Modal.confirm({
+                                title: 'Delete Station',
+                                content: 'Are you sure you want to delete this station? This will also delete the associated station owner account.',
+                                okText: 'Yes, Delete',
+                                okType: 'danger',
+                                cancelText: 'No',
+                                onOk: () => handleDelete(record.id),
+                                okButtonProps: { loading: deletingId === record.id }
+                            });
+                        }}
+                    />
                 </Space>
             ),
         },

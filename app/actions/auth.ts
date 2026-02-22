@@ -4,6 +4,17 @@ import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { SITE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from '@/app/config/constants'
+import { sendPasswordResetEmail } from '@/lib/mail'
+
+const supabaseAdmin = createAdminClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+})
+
 export async function signUp(formData: any) {
     const supabase = await createClient()
     const { email, password, name } = formData
@@ -68,9 +79,37 @@ export async function signOut() {
 }
 
 export async function resetPassword(email: string) {
+    try {
+        const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'recovery',
+            email: email,
+            options: {
+                redirectTo: `${SITE_URL}/auth/callback?next=/reset-password`,
+            }
+        })
+
+        if (error) {
+            return { error: error.message }
+        }
+
+        // Use custom link with token_hash for better SSR support
+        const customResetLink = `${SITE_URL}/auth/callback?token_hash=${data.properties.hashed_token}&type=recovery&next=/reset-password`
+        const mailResult = await sendPasswordResetEmail(email, customResetLink)
+
+        if (mailResult.error) {
+            return { error: `Failed to send reset email: ${mailResult.error}` }
+        }
+
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function updatePassword(password: string) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/reset-password`,
+    const { error } = await supabase.auth.updateUser({
+        password: password
     })
 
     if (error) {
@@ -78,4 +117,49 @@ export async function resetPassword(email: string) {
     }
 
     return { success: true }
+}
+
+export async function getUserProfile() {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Not authenticated' }
+
+    try {
+        const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            include: { station: true }
+        })
+        return { data: dbUser }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function updateProfile(formData: { name: string; phone?: string; address?: string }) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Not authenticated' }
+
+    try {
+        // 1. Update Prisma User
+        const dbUser = await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                name: formData.name,
+                phone: formData.phone || null,
+            }
+        })
+
+        // 2. Update Supabase User Metadata
+        await supabase.auth.updateUser({
+            data: { full_name: formData.name }
+        })
+
+        return { success: true }
+    } catch (error: any) {
+        console.error('updateProfile Error:', error)
+        return { error: error.message }
+    }
 }

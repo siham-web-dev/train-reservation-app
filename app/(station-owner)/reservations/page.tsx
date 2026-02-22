@@ -1,8 +1,10 @@
 "use client";
 
-import React from 'react';
-import { Typography, Table, Tag, Input, Space, Button, DatePicker } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Table, Tag, Input, Space, Button, DatePicker, Spin } from 'antd';
 import { SearchOutlined, PrinterOutlined } from '@ant-design/icons';
+import { getUserProfile } from '@/app/actions/auth';
+import { getStationReservations } from '@/app/actions/bookings';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -56,37 +58,32 @@ const columns = [
     },
 ];
 
-const data = [
-    {
-        key: '1',
-        id: 'BKR-92834',
-        passenger: 'Alice Johnson',
-        train: 'T-Express 401',
-        date: 'Oct 25, 2023 - 14:00',
-        status: 'Confirmed',
-        amount: '$45.00',
-    },
-    {
-        key: '2',
-        id: 'BKR-92835',
-        passenger: 'Bob Smith',
-        train: 'Commuter Line A',
-        date: 'Oct 25, 2023 - 15:30',
-        status: 'Pending',
-        amount: '$12.50',
-    },
-    {
-        key: '3',
-        id: 'BKR-92836',
-        passenger: 'Charlie Brown',
-        train: 'T-Express 401',
-        date: 'Oct 26, 2023 - 09:15',
-        status: 'Cancelled',
-        amount: '$45.00',
-    },
-];
-
 export default function StationOwnerReservationsPage() {
+    const [reservations, setReservations] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadData() {
+            const profileRes = await getUserProfile();
+            if (profileRes.data?.station_id) {
+                const res = await getStationReservations(profileRes.data.station_id);
+                if (!('error' in res)) {
+                    setReservations(res.data);
+                }
+            }
+            setLoading(false);
+        }
+        loadData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -107,13 +104,13 @@ export default function StationOwnerReservationsPage() {
             <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
                 <div className="mb-4">
                     <Space wrap>
-                        <Tag color="blue" className="cursor-pointer text-sm py-1 px-3">All (145)</Tag>
-                        <Tag className="cursor-pointer text-sm py-1 px-3">Confirmed (120)</Tag>
-                        <Tag className="cursor-pointer text-sm py-1 px-3">Pending (15)</Tag>
-                        <Tag className="cursor-pointer text-sm py-1 px-3">Cancelled (10)</Tag>
+                        <Tag color="blue" className="cursor-pointer text-sm py-1 px-3">All ({reservations.length})</Tag>
+                        <Tag className="cursor-pointer text-sm py-1 px-3">Confirmed ({reservations.filter(r => r.status === 'Confirmed').length})</Tag>
+                        <Tag className="cursor-pointer text-sm py-1 px-3">Pending ({reservations.filter(r => r.status === 'Pending').length})</Tag>
+                        <Tag className="cursor-pointer text-sm py-1 px-3">Cancelled ({reservations.filter(r => r.status === 'Cancelled').length})</Tag>
                     </Space>
                 </div>
-                <Table columns={columns} dataSource={data} />
+                <Table columns={columns} dataSource={reservations} />
             </div>
         </div>
     );

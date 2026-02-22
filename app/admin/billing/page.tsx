@@ -1,8 +1,9 @@
 "use client";
 
-import React from 'react';
-import { Typography, Row, Col, Card, Statistic, Table, Tag, Button } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Row, Col, Card, Statistic, Table, Tag, Button, Spin } from 'antd';
 import { DollarOutlined, RiseOutlined, DownloadOutlined } from '@ant-design/icons';
+import { getAdminBillingStats } from '@/app/actions/billing';
 
 const { Title, Text } = Typography;
 
@@ -42,34 +43,31 @@ const columns = [
     },
 ];
 
-const data = [
-    {
-        key: '1',
-        id: 'TRX-892347',
-        description: 'Station Subscription (Central)',
-        amount: '+$500.00',
-        status: 'Completed',
-        date: 'Oct 24, 2023',
-    },
-    {
-        key: '2',
-        id: 'TRX-892348',
-        description: 'Ticket Commission (100 bookings)',
-        amount: '+$150.00',
-        status: 'Completed',
-        date: 'Oct 23, 2023',
-    },
-    {
-        key: '3',
-        id: 'TRX-892349',
-        description: 'Station Subscription (North)',
-        amount: '+$300.00',
-        status: 'Pending',
-        date: 'Oct 23, 2023',
-    },
-];
-
 export default function AdminBillingPage() {
+    const [stats, setStats] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadStats() {
+            const data = await getAdminBillingStats();
+            if ('error' in data) {
+                console.error(data.error);
+            } else {
+                setStats(data);
+            }
+            setLoading(false);
+        }
+        loadStats();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -86,8 +84,8 @@ export default function AdminBillingPage() {
                 <Col xs={24} sm={8}>
                     <Card className="rounded-xl shadow-sm border-gray-100 h-full">
                         <Statistic
-                            title="Total Revenue (This Month)"
-                            value={45231.89}
+                            title="Total Revenue (All Time)"
+                            value={stats?.totalRevenue || 0}
                             precision={2}
                             prefix={<DollarOutlined />}
                             valueStyle={{ color: '#3f8600' }}
@@ -101,11 +99,11 @@ export default function AdminBillingPage() {
                     <Card className="rounded-xl shadow-sm border-gray-100 h-full">
                         <Statistic
                             title="Active Subscriptions"
-                            value={142}
+                            value={stats?.activeSubscriptions || 0}
                             valueStyle={{ color: '#1677ff' }}
                         />
                         <div className="mt-2 text-sm text-gray-500">
-                            Across 45 stations
+                            Across the network
                         </div>
                     </Card>
                 </Col>
@@ -120,8 +118,8 @@ export default function AdminBillingPage() {
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mt-6">
                 <Title level={4} className="!mt-0 !mb-4">Recent Transactions</Title>
-                <Table columns={columns} dataSource={data} pagination={{ pageSize: 5 }} />
+                <Table columns={columns} dataSource={stats?.recentTransactions || []} pagination={{ pageSize: 5 }} />
             </div>
-        </div>
+        </div >
     );
 }

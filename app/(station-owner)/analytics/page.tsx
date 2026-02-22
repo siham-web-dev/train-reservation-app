@@ -1,12 +1,39 @@
 "use client";
 
-import React from 'react';
-import { Typography, Row, Col, Card, Progress } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Row, Col, Card, Progress, Spin } from 'antd';
 import { RiseOutlined, FireOutlined, LineChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { getUserProfile } from '@/app/actions/auth';
+import { getStationAnalytics } from '@/app/actions/analytics';
 
 const { Title, Text } = Typography;
 
 export default function StationOwnerAnalyticsPage() {
+    const [stats, setStats] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadData() {
+            const profileRes = await getUserProfile();
+            if (profileRes.data?.station_id) {
+                const analyticsRes = await getStationAnalytics(profileRes.data.station_id);
+                if (!('error' in analyticsRes)) {
+                    setStats(analyticsRes);
+                }
+            }
+            setLoading(false);
+        }
+        loadData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div>
@@ -19,7 +46,7 @@ export default function StationOwnerAnalyticsPage() {
                     <Card className="rounded-xl shadow-sm border-gray-100 hover:shadow-md transition-shadow">
                         <Text type="secondary" className="block mb-2 font-medium">Daily Passengers</Text>
                         <div className="flex items-baseline gap-2">
-                            <Title level={2} className="!m-0">4,289</Title>
+                            <Title level={2} className="!m-0">{stats?.dailyPassengers || 0}</Title>
                             <Text className="text-green-500 text-sm"><RiseOutlined /> +8.2%</Text>
                         </div>
                         <div className="mt-4 text-xs text-gray-400">vs. previous day</div>
@@ -29,7 +56,7 @@ export default function StationOwnerAnalyticsPage() {
                     <Card className="rounded-xl shadow-sm border-gray-100 hover:shadow-md transition-shadow">
                         <Text type="secondary" className="block mb-2 font-medium">Revenue (Today)</Text>
                         <div className="flex items-baseline gap-2">
-                            <Title level={2} className="!m-0">$12.4k</Title>
+                            <Title level={2} className="!m-0">${(stats?.dailyRevenue / 1000).toFixed(1)}k</Title>
                             <Text className="text-green-500 text-sm"><RiseOutlined /> +3.1%</Text>
                         </div>
                         <div className="mt-4 text-xs text-gray-400">vs. same day last week</div>
@@ -39,7 +66,7 @@ export default function StationOwnerAnalyticsPage() {
                     <Card className="rounded-xl shadow-sm border-gray-100 hover:shadow-md transition-shadow">
                         <Text type="secondary" className="block mb-2 font-medium">On-Time Performance</Text>
                         <div className="flex items-center gap-4 mt-2">
-                            <Progress type="circle" percent={92} size={60} strokeColor="#52c41a" />
+                            <Progress type="circle" percent={stats?.onTimePerformance || 100} size={60} strokeColor="#52c41a" />
                             <div>
                                 <Text strong className="block text-green-600">Excellent</Text>
                                 <Text type="secondary" className="text-xs">Target: 90%</Text>
